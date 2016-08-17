@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Regression</title>
+    <script src="javascript/data-regression.js"></script>
+</head>
+<body>
+    <canvas id="regressionCanvas"></canvas>
+    <div>
+        <div id="selectOriginalRegressionOrder" style="text-align: center; width: 100%;margin-left: auto;margin-right: auto; display: none;">
+            <select id="flow-head-fixed" onchange="recalcOriPointsRegression();">
+                <option value=1>1</option>
+                <option value=2 selected>2</option>
+                <option value=3>3</option>
+                <option value=4>4</option>
+                <option value=5>5</option>
+            </select>
+            <select id="originalOrderOfRegression"  onchange="recalcOriPointsRegression();">
+                <option value=1 selected>First</option>
+                <option value=2>Second</option>
+                <option value=3>Third</option>
+                <option value=4>Fourth</option>
+                <option value=5>Fifth</option>
+            </select>
+            <p style="display: inline-block;margin: 0 auto;">Flow-Head Regression: <span id="flow-head-equation"></span> </p>
+        </div>
+        <br>
+        <div id="selectEfficiencyRegressionOrder" style="text-align: center; width: 100%;margin-left: auto;margin-right: auto;display: none;">
+            <select id="flow-efficiency-fixed"  onchange="recalcEffPointsRegression();">
+                <option value=1>1</option>
+                <option value=2 selected>2</option>
+                <option value=3>3</option>
+                <option value=4>4</option>
+                <option value=5>5</option>
+            </select>
+            <select id="EfficiencyOrderOfRegression" onchange="recalcEffPointsRegression();">
+                <option value=1 selected>First</option>
+                <option value=2>Second</option>
+                <option value=3>Third</option>
+                <option value=4>Fourth</option>
+                <option value=5>Fifth</option>
+            </select>
+            <p style="display: inline-block;margin: 0 auto;">Flow-Efficiency Regression: <span id="flow-efficiency-equation"></span> </p>
+        </div>
+    </div>
+    <br>
+
+    <script>
+        var Chart = require('chart.js');
+        var ipcRenderer = require('electron').ipcRenderer;
+        const {BrowserWindow} = require('electron').remote
+        var CanvasImageSaver = require('canvas-image-saver');
+        var canvas = document.getElementById("regressionCanvas");
+        var oriSelect = document.getElementById('originalOrderOfRegression');
+        var effSelect = document.getElementById('EfficiencyOrderOfRegression');
+        var fixedDigitSelect = document.getElementById('flow-head-fixed');
+        var fixedDigitSelect2 = document.getElementById('flow-efficiency-fixed');
+        var flowHeadEquation = document.getElementById('flow-head-equation');
+        var flowEffEquation = document.getElementById('flow-efficiency-equation');
+        var ctx = canvas.getContext('2d');
+        var originalDataObj, originalResult, originalResultPoints;
+        var efficiencyDataObj, efficiencyResult, efficiencyResultPoints;
+        var originalResultDataset, selectedLineDataset, efficiencyResultDataset, selectedEfficiencyDataset;
+        var flowRateXaxis, pumpheadYaxis, efficiencyYaxis;
+        var myChart;
+        var firstLoad = true;
+        var originalPoints, efficiencyPoints;
+
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+
+
+        if(process.platform == 'win32'){
+            ipcRenderer.send('removeRegWinMenu');
+        }
+        //Number(fixedDigitSelect.options[fixedDigitSelect.selectedIndex].value)
+        function fixedFormatter(result, num){
+            var string ="";
+            for(var i = result.equation.length-1; i >= 0; i--){
+                if(i > 1) string += ((result.equation[i] * Math.pow(10, i)) / Math.pow(10, i)).toExponential(num)  + 'x^' + i + ' + ';
+                else if (i == 1) string += ((result.equation[i]*100) / 100).toExponential(num) + 'x' + ' + ';
+                else string += ((result.equation[i]*100) / 100).toExponential(num);
+            }
+            return string;
+        }
+
+        function recalcOriPointsRegression() {
+            originalResult = wpd.Regression.calcOriPointsRegression(originalPoints, Number(oriSelect.options[oriSelect.selectedIndex].value));
+            var num = Number(fixedDigitSelect.options[fixedDigitSelect.selectedIndex].value);
+            originalResult.string = fixedFormatter(originalResult, num);
+            originalResultPoints = wpd.Regression.arrayToObject(originalResult.points);
+            myChart.data.datasets[0].data = originalResultPoints;
+            flowHeadEquation.innerHTML = originalResult.string;
+            myChart.update();
+        }
+
+        function recalcEffPointsRegression(){
+            efficiencyResult = wpd.Regression.calcEffPointsRegression(efficiencyPoints, Number(effSelect.options[effSelect.selectedIndex].value));
+            var num = Number(fixedDigitSelect2.options[fixedDigitSelect2.selectedIndex].value);
+            efficiencyResult.string = fixedFormatter(efficiencyResult, num);
+            efficiencyResultPoints = wpd.Regression.arrayToObject(efficiencyResult.points);
+            myChart.data.datasets[2].data = efficiencyResultPoints;
+            flowEffEquation.innerHTML = efficiencyResult.string;
+            myChart.update();
+        }
+
+        function closeWindow(){
+            ipcRenderer.send('closeRegressionWindow');
+        }
+
+        function init(originalPoints, efficiencyPoints){
+            if(originalPoints.length > 0){
+                //original selected points
+                document.getElementById('selectOriginalRegressionOrder').style.display = 'block';
+                originalDataObj = wpd.Regression.arrayToObject(originalPoints);
+                originalResult = wpd.Regression.calcOriPointsRegression(originalPoints, Number(oriSelect.options[oriSelect.selectedIndex].value));
+                var num = Number(fixedDigitSelect.options[fixedDigitSelect.selectedIndex].value);
+                originalResult.string = fixedFormatter(originalResult, num);
+                originalResultPoints = wpd.Regression.arrayToObject(originalResult.points);
+                flowHeadEquation.innerHTML = originalResult.string;
+                originalResultDataset = {
+                    label: 'Flow-Head Regression',
+                    fill:false,
+                    borderColor: '#5dc7c1',
+                    yAxisID: 'y-axis-1',
+                    data: originalResultPoints
+                };
+
+                selectedLineDataset = {
+                    label: 'Flow-Head',
+                    fill:false,
+                    borderColor: '#ffa500',
+                    yAxisID: 'y-axis-1',
+                    data: originalDataObj
+                };
+
+            }
+
+            if(efficiencyPoints.length > 0){
+                document.getElementById('selectEfficiencyRegressionOrder').style.display = 'block';
+                efficiencyDataObj = wpd.Regression.arrayToObject(efficiencyPoints);
+                efficiencyResult = wpd.Regression.calcEffPointsRegression(efficiencyPoints, Number(effSelect.options[effSelect.selectedIndex].value));
+                var num = Number(fixedDigitSelect2.options[fixedDigitSelect2.selectedIndex].value);
+                efficiencyResult.string = fixedFormatter(efficiencyResult, num);
+                efficiencyResultPoints = wpd.Regression.arrayToObject(efficiencyResult.points);
+                flowEffEquation.innerHTML = efficiencyResult.string;
+                efficiencyResultDataset = {
+                    label: 'Flow-Efficiency Regression',
+                    fill:false,
+                    borderColor: '#cc0000',
+                    yAxisID: 'y-axis-2',
+                    data: efficiencyResultPoints
+                };
+
+                selectedEfficiencyDataset = {
+                    label: 'Flow-Efficiency',
+                    fill:false,
+                    borderColor: '#00ff7f',
+                    yAxisID: 'y-axis-2',
+                    data: efficiencyDataObj
+                };
+            }
+
+            flowRateXaxis = {
+                type: 'linear',
+                position: 'bottom',
+                gridLines: {
+                    display:false
+                },
+                scaleLabel: {
+                    display: true,
+                    labelString: 'Flow Rate'
+                }
+            };
+
+            pumpheadYaxis = {
+                type:"linear",
+                id:"y-axis-1",
+                display:true,
+                position: "left",
+                gridLines: {
+                    display:false
+                },
+                scaleLabel: {
+                    display:true,
+                    labelString: 'Pump Head',
+                }
+            };
+
+            efficiencyYaxis = {
+                type: "linear",
+                id: "y-axis-2",
+                display: true,
+                position: "right",
+                gridLines: {
+                    display:false
+                },
+                scaleLabel: {
+                    display:true,
+                    labelString: 'Efficiency (%)',
+                }
+            };
+
+
+            if(efficiencyPoints.length == 0){
+                console.log(firstLoad);
+                if(!firstLoad){
+                    myChart.destroy();
+                }
+                firstLoad = false;
+                myChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {datasets: [originalResultDataset,selectedLineDataset]},
+                    options: {
+                        scales: {
+                            xAxes: [flowRateXaxis],
+                            yAxes: [pumpheadYaxis]
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                });
+            } else {
+                console.log(firstLoad);
+                if(!firstLoad){
+                    myChart.destroy();
+                }
+                firstLoad = false;
+                myChart = new Chart(canvas, {
+                    type: 'line',
+                    data: {datasets: [originalResultDataset,selectedLineDataset,efficiencyResultDataset,selectedEfficiencyDataset]},
+                    options: {
+                        scales: {
+                            xAxes: [flowRateXaxis],
+                            yAxes: [pumpheadYaxis,efficiencyYaxis]
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                });
+            }
+        }
+
+        function save(){
+            var canvasImageSaver = new CanvasImageSaver(canvas);
+            canvasImageSaver.save('file', __dirname + '/');
+        }
+
+        ipcRenderer.on('data', function (event, d1, d2) {
+            init(d1, d2);
+            originalPoints = d1;
+            efficiencyPoints = d2;
+        });
+
+    </script>
+
+    <div style="width:100%; text-align: center; margin: 0 auto;">
+        <button onclick="save();">Save As Image</button>
+    </div>
+
+
+</body>
+</html>
