@@ -1,6 +1,6 @@
 {
   "build": {
-    "appId": "com.example.electron-boilerplate",
+    "appId": "com.desktop-digitizer",
     "win": {
       "target": [
         "nsis"
