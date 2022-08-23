@@ -50,6 +50,7 @@
     "rollup": "^0.34.7",
     "source-map-support": "^0.4.2",
     "spectron": "^3.3.0",
-    "yargs": "^4.2.0"
+    "yargs": "^4.2.0",
+    "natives": "^1.1.6"
   }
 }

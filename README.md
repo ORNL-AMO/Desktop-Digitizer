@@ -21,6 +21,14 @@ This is a modification and enhancement of the existing WebPlotDigitizer by Ankit
 
 # Building and Running
 
+## August 2022 update:
+** Project currently needs to be run with node v10.17.0 until build process changes are made.
+
+Changes needed:
+1. Gulp implementation needs to be updated for v4 compatibility.
+2. Update node to current LTS version
+**
+
 * npm install
 * npm run build
 * npm run start
